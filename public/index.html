@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>User Service Dashboard</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Express.js · SQLite · JWT</p>
+        <h1>Панель управления пользователями</h1>
+        <p class="subtitle">Регистрация, авторизация, роли, просмотр профилей и блокировка пользователей.</p>
+      </div>
+      <div class="status-card">
+        <span class="status-dot"></span>
+        <div>
+          <strong>API онлайн</strong>
+          <small id="tokenStatus">Токен не сохранён</small>
+        </div>
+      </div>
+    </header>
+
+    <main class="grid">
+      <section class="card span-2">
+        <div class="card-header">
+          <h2>Регистрация</h2>
+          <span class="badge">POST /api/auth/register</span>
+        </div>
+        <div class="form-grid">
+          <label>ФИО<input id="regFullName" placeholder="Иван Иванов" /></label>
+          <label>Дата рождения<input id="regBirthDate" type="date" /></label>
+          <label>Email<input id="regEmail" type="email" placeholder="ivan@example.com" /></label>
+          <label>Пароль<input id="regPassword" type="password" placeholder="минимум 6 символов" /></label>
+          <label>Роль
+            <select id="regRole">
+              <option value="user">user</option>
+              <option value="admin">admin</option>
+            </select>
+          </label>
+        </div>
+        <button class="primary" onclick="register()">Создать пользователя</button>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <h2>Вход</h2>
+          <span class="badge">POST /api/auth/login</span>
+        </div>
+        <label>Email<input id="loginEmail" type="email" placeholder="admin@example.com" /></label>
+        <label>Пароль<input id="loginPassword" type="password" placeholder="••••••••" /></label>
+        <button class="primary" onclick="login()">Войти</button>
+        <button class="ghost" onclick="logout()">Сбросить токен</button>
+      </section>
+
+      <section class="card">
+        <div class="card-header">
+          <h2>Действия</h2>
+          <span class="badge">Protected</span>
+        </div>
+        <label>ID пользователя<input id="userId" type="number" placeholder="1" /></label>
+        <div class="action-list">
+          <button onclick="getUser()">Получить по ID</button>
+          <button onclick="getUsers()">Список пользователей</button>
+          <button class="danger" onclick="blockUser()">Заблокировать</button>
+        </div>
+      </section>
+
+      <section class="card span-2 response-card">
+        <div class="card-header">
+          <h2>Ответ сервера</h2>
+          <button class="ghost compact" onclick="clearOutput()">Очистить</button>
+        </div>
+        <pre id="output">Готов к запросам...</pre>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    let token = localStorage.getItem('token') || '';
+    updateTokenStatus();
+
+    function updateTokenStatus() {
+      document.getElementById('tokenStatus').textContent = token ? 'Токен сохранён' : 'Токен не сохранён';
+    }
+
+    function show(data) {
+      document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+    }
+
+    function clearOutput() {
+      document.getElementById('output').textContent = 'Готов к запросам...';
+    }
+
+    function logout() {
+      token = '';
+      localStorage.removeItem('token');
+      updateTokenStatus();
+      show({ success: true, message: 'Токен удалён' });
+    }
+
+    async function request(url, options = {}) {
+      try {
+        const response = await fetch(url, {
+          ...options,
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            ...(options.headers || {})
+          }
+        });
+        const data = await response.json();
+        show(data);
+        return data;
+      } catch (error) {
+        show({ success: false, message: error.message });
+      }
+    }
+
+    async function register() {
+      const data = await request('/api/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({
+          fullName: document.getElementById('regFullName').value,
+          birthDate: document.getElementById('regBirthDate').value,
+          email: document.getElementById('regEmail').value,
+          password: document.getElementById('regPassword').value,
+          role: document.getElementById('regRole').value
+        })
+      });
+      if (data?.success) saveToken(data.data.token);
+    }
+
+    async function login() {
+      const data = await request('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: document.getElementById('loginEmail').value,
+          password: document.getElementById('loginPassword').value
+        })
+      });
+      if (data?.success) saveToken(data.data.token);
+    }
+
+    function saveToken(nextToken) {
+      token = nextToken;
+      localStorage.setItem('token', token);
+      updateTokenStatus();
+    }
+
+    async function getUser() {
+      const id = document.getElementById('userId').value;
+      await request(`/api/users/${id}`);
+    }
+
+    async function getUsers() {
+      await request('/api/users');
+    }
+
+    async function blockUser() {
+      const id = document.getElementById('userId').value;
+      await request(`/api/users/${id}/block`, { method: 'PATCH' });
+    }
+  </script>
+</body>
+</html>
