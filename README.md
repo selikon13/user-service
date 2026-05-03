@@ -1,4 +1,4 @@
-# User Service API 
+# User Service
 
 ## Description
 A production-ready user management service with authentication, role-based access control, and REST API.
